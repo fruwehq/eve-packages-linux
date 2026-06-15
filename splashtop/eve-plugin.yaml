@@ -7,7 +7,7 @@ commands:
   status: {exec: scripts/package-plugin, args: [splashtop, status]}
   down: {exec: scripts/package-plugin, args: [splashtop, down]}
 supports:
-  os_families: [ubuntu, windows]
+  os_families: [ubuntu]
   arches: [amd64]
 compatibility_enforced: true
 compatibility:
@@ -45,7 +45,3 @@ actions:
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/splashtop.sh]
-  windows:
-    steps: [provision/windows/splashtop.ps1]
-    state_files: [env.json]
-    fallback: false

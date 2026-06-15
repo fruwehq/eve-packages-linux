@@ -6,7 +6,7 @@ commands:
   install: {exec: scripts/package-plugin, args: [nomachine, install]}
   status: {exec: scripts/package-plugin, args: [nomachine, status]}
   down: {exec: scripts/package-plugin, args: [nomachine, down]}
-supports: {os_families: [ubuntu, windows]}
+supports: {os_families: [ubuntu]}
 compatibility_enforced: true
 compatibility:
   - platform: windows
@@ -56,7 +56,3 @@ actions:
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/nomachine.sh]
-  windows:
-    steps: [provision/windows/nomachine.ps1]
-    state_files: [env.json]
-    fallback: false

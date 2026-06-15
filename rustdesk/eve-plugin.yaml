@@ -6,7 +6,7 @@ commands:
   install: {exec: scripts/package-plugin, args: [rustdesk, install]}
   status: {exec: scripts/package-plugin, args: [rustdesk, status]}
   down: {exec: scripts/package-plugin, args: [rustdesk, down]}
-supports: {os_families: [ubuntu, windows]}
+supports: {os_families: [ubuntu]}
 compatibility_enforced: true
 compatibility:
   - platform: windows
@@ -56,7 +56,3 @@ actions:
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/rustdesk.sh]
-  windows:
-    steps: [provision/windows/rustdesk.ps1]
-    state_files: [env.json]
-    fallback: false

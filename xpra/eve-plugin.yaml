@@ -7,7 +7,7 @@ commands:
   status: {exec: scripts/package-plugin, args: [xpra, status]}
   down: {exec: scripts/package-plugin, args: [xpra, down]}
 supports:
-  os_families: [ubuntu, windows]
+  os_families: [ubuntu]
   arches: [amd64]
   ubuntu_versions: ["22.04", "24.04"]
 compatibility_enforced: true
@@ -34,10 +34,6 @@ actions:
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/xpra.sh]
-  windows:
-    steps: [provision/windows/xpra.ps1]
-    state_files: []
-    fallback: false
 bundles:
   - id: remote-xpra
     includes: [xpra]

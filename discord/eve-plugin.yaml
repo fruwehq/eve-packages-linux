@@ -6,7 +6,7 @@ commands:
   install: {exec: scripts/package-plugin, args: [discord, install]}
   status: {exec: scripts/package-plugin, args: [discord, status]}
   down: {exec: scripts/package-plugin, args: [discord, down]}
-supports: {os_families: [ubuntu, windows], arches: [amd64]}
+supports: {os_families: [ubuntu], arches: [amd64]}
 compatibility_enforced: false
 compatibility:
   - platform: ubuntu
@@ -24,7 +24,3 @@ env: []
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/discord.sh]
-  windows:
-    steps: [provision/windows/discord.ps1]
-    state_files: []
-    fallback: false
