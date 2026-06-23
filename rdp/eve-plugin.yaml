@@ -60,6 +60,10 @@ actions:
     label: RDP
     target: rdp.open
     native: true
+    exec: commands/rdp-open
+vagrant:
+  port_forwards:
+    - {guest: 3389, host: 3389}
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/rdp.sh]
