@@ -59,9 +59,14 @@ actions:
   - id: web
     label: ThinLinc Web
     target: thinlinc.web
+    exec: commands/thinlinc-web
   - id: client
     label: ThinLinc Client
     target: thinlinc.client
+    exec: commands/thinlinc-client
+vagrant:
+  port_forwards:
+    - {guest: 300, host: 300}
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/thinlinc.sh]

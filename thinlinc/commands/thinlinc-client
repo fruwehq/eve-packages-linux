@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Open the native ThinLinc Client (action: thinlinc.client)."""
+from __future__ import annotations
+
+import os
+import platform
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _client import has_command, thinlinc_client_args, thinlinc_client_linux_command, thinlinc_client_macos_command  # noqa: E402
+
+_THINLINC_APP = "/Applications/ThinLinc Client.app"
+
+
+def main() -> int:
+    ip = os.environ.get("EVE_REMOTE_IP", "")
+    if not ip:
+        print("thinlinc-client: EVE_REMOTE_IP is not set", file=sys.stderr)
+        return 1
+    user_name = os.environ.get("VM_USER_NAME", "")
+    args = thinlinc_client_args(ip, user_name)
+    if platform.system() == "Darwin":
+        if Path(_THINLINC_APP).is_dir():
+            cmd = thinlinc_client_macos_command(args)
+            os.execvp(cmd[0], cmd)
+        print("thinlinc-client: install ThinLinc Client.app, then retry.", file=sys.stderr)
+        return 2
+    if has_command("tlclient"):
+        cmd = thinlinc_client_linux_command(args)
+        os.execvp(cmd[0], cmd)
+    print("thinlinc-client: tlclient not found", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
