@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Pair Moonlight with Sunshine via a fixed PIN (action: moonlight.pair)."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _client import moonlight_pair_command, sunshine_pair_curl_command  # noqa: E402
+
+
+def main() -> int:
+    if "sunshine" not in os.environ.get("BUNDLE_PACKAGES", "").split(","):
+        print("sunshine not in bundle — skipping")
+        return 0
+    ip = os.environ.get("EVE_REMOTE_IP", "")
+    if not ip:
+        print("moonlight-pair: EVE_REMOTE_IP is not set", file=sys.stderr)
+        return 1
+    root = os.environ.get("EVE_REMOTE_ROOT", ".")
+    pin = "1234"
+    response_file = str(Path(root) / "tmp" / "moonlight-pair-response.json")
+    Path(response_file).parent.mkdir(parents=True, exist_ok=True)
+    Path(response_file).unlink(missing_ok=True)
+
+    print(f"Starting Moonlight pairing against {ip} with PIN {pin}...")
+    moonlight = subprocess.Popen(moonlight_pair_command(ip, pin))
+    time.sleep(2)
+    print("Submitting pairing PIN to Sunshine...")
+    curl = subprocess.run(
+        sunshine_pair_curl_command(ip, pin, response_file),
+        capture_output=True, text=True, check=False,
+    )
+    http_code = curl.stdout
+    if curl.returncode != 0:
+        moonlight.terminate()
+        moonlight.wait()
+        print("Sunshine pairing API call failed.")
+        return 1
+    if not http_code.startswith("2"):
+        moonlight.terminate()
+        moonlight.wait()
+        print(f"Sunshine pairing API returned HTTP {http_code}.")
+        if Path(response_file).is_file():
+            print(Path(response_file).read_text(), end="")
+        return 1
+    print("Sunshine pairing API accepted the PIN. Waiting for Moonlight to finish...")
+    return moonlight.wait()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
