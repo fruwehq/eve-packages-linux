@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""Open a VNC session (action: vnc.open).
+
+Reads EVE_REMOTE_* and uses $EVE_REMOTE_ROOT/scripts/instance-ssh + instance-paths
++ `vagrant ssh-config` (vagrant engine). Behavior ported from core remote-vnc.
+"""
+from __future__ import annotations
+
+import contextlib
+import os
+import shlex
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _client import (  # noqa: E402
+    has_command,
+    ssh_config_field,
+    validate_unix_user,
+    vnc_passwd_fetch_command,
+    vnc_system_open_command,
+    vnc_tunnel_command,
+    vnc_tunnel_opts_terraform,
+    vnc_tunnel_opts_vagrant,
+    vnc_viewer_args,
+    vncviewer_command,
+)
+
+
+def _ssh(root: str, instance: str, remote_cmd: str, *, text: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [str(Path(root) / "scripts/instance-ssh"), instance, "--", remote_cmd],
+        cwd=root, capture_output=not text, text=text, check=False,
+    )
+
+
+def _instance_workdir(root: str, instance: str) -> str:
+    result = subprocess.run(
+        [str(Path(root) / "scripts/instance-paths"), "--instance", instance, "--emit", "env"],
+        cwd=root, text=True, capture_output=True, check=False,
+    )
+    sys.stderr.write(result.stderr)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+    for line in result.stdout.splitlines():
+        if line.startswith("INSTANCE_WORKDIR="):
+            return line.split("=", 1)[1]
+    raise SystemExit(1)
+
+
+def _vagrant_ssh_config(workdir: str) -> str:
+    result = subprocess.run(["vagrant", "ssh-config"], cwd=workdir, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+    return result.stdout
+
+
+def main() -> int:
+    root = os.environ.get("EVE_REMOTE_ROOT", ".")
+    instance = os.environ.get("EVE_REMOTE_INSTANCE", "")
+    engine = os.environ.get("EVE_REMOTE_ENGINE", "") or os.environ.get("ENGINE", "")
+    ip = os.environ.get("EVE_REMOTE_IP", "")
+    ssh_user = os.environ.get("SSH_USER", "")
+    vm_user_name = os.environ.get("VM_USER_NAME", "")
+    vnc_user = vm_user_name or ssh_user
+
+    vnc_port = os.environ.get("VNC_PORT", "5901")
+    local_port = os.environ.get("VNC_LOCAL_PORT", "15900")
+    vnc_viewer = os.environ.get("VNC_VIEWER", "auto")
+    if vnc_viewer not in ("auto", "system", "tigervnc"):
+        print(f"vnc-open: invalid VNC_VIEWER='{vnc_viewer}' (valid: auto, system, tigervnc)", file=sys.stderr)
+        return 2
+
+    validate_unix_user(vnc_user)
+
+    print(f"[vnc] Checking remote VNC server on port {vnc_port}...")
+    check = _ssh(root, instance, f"ss -tln 2>/dev/null | grep -q ':{vnc_port} '")
+    if check.returncode != 0:
+        sys.stderr.write(check.stdout or "")
+        sys.stderr.write(check.stderr or "")
+        print(f"[vnc] Nothing listening on remote port {vnc_port} (is the instance running/provisioned?).", file=sys.stderr)
+        return 1
+
+    free = subprocess.run(["lsof", "-ti", f":{local_port}"], capture_output=True, text=True, check=False)
+    if free.stdout.strip():
+        print(f"[vnc] Local port {local_port} in use; closing existing tunnel.", file=sys.stderr)
+        for pid in free.stdout.split():
+            subprocess.run(["kill", pid], check=False)
+        time.sleep(1)
+
+    if engine == "vagrant":
+        workdir = _instance_workdir(root, instance)
+        config = _vagrant_ssh_config(workdir)
+        ssh_port = ssh_config_field(config, "Port")
+        priv_key = ssh_config_field(config, "IdentityFile")
+        target = f"vagrant@{ip}"
+        opts = vnc_tunnel_opts_vagrant(ssh_port, priv_key)
+    else:
+        priv_key = os.environ.get("EVE_REMOTE_KEY", "")
+        target = f"{ssh_user}@{ip}"
+        opts = vnc_tunnel_opts_terraform(priv_key)
+
+    tunnel = subprocess.run(vnc_tunnel_command(local_port, vnc_port, target, opts), check=False)
+    if tunnel.returncode != 0:
+        return tunnel.returncode
+
+    vnc_password = os.environ.get("VNC_PASSWORD", "vagrant")
+    print(f"[vnc] Tunnel active on localhost:{local_port}; opening viewer...")
+
+    auth_args: list[str] = []
+    passwd_file = ""
+    if vnc_viewer != "system" and has_command("mktemp"):
+        fd, passwd_file = tempfile.mkstemp(prefix="eve-vnc-passwd.", dir=os.environ.get("TMPDIR", "/tmp"))
+        os.close(fd)
+        os.chmod(passwd_file, 0o600)
+        fetch = _ssh(root, instance, vnc_passwd_fetch_command(vnc_user), text=False)
+        if fetch.returncode == 0:
+            Path(passwd_file).write_bytes(fetch.stdout)
+            auth_args = ["-passwd", passwd_file]
+        else:
+            Path(passwd_file).unlink(missing_ok=True)
+            passwd_file = ""
+            print(f"[vnc] Could not fetch VNC password file; enter '{vnc_password}' if prompted.")
+
+    viewer_args = vnc_viewer_args()
+
+    def open_system() -> int:
+        if has_command("open"):
+            subprocess.run(vnc_system_open_command(vnc_password, local_port), check=False)
+            print(f"[vnc] macOS Screen Sharing; kill $(lsof -ti :{local_port}) to close.")
+            return 0
+        print("vnc-open: system viewer requested but 'open' is unavailable", file=sys.stderr)
+        return 1
+
+    def open_tigervnc() -> int:
+        if has_command("vncviewer"):
+            return subprocess.run(vncviewer_command(viewer_args, auth_args, local_port), check=False).returncode
+        print("vnc-open: TigerVNC requested but vncviewer is not installed", file=sys.stderr)
+        return 1
+
+    try:
+        vnc_viewer_cmd = os.environ.get("VNC_VIEWER_CMD", "")
+        if vnc_viewer_cmd:
+            cmd = shlex.split(vnc_viewer_cmd) + viewer_args + auth_args + [f"127.0.0.1::{local_port}"]
+            return subprocess.run(cmd, check=False).returncode
+        if vnc_viewer == "system":
+            return open_system()
+        if vnc_viewer == "tigervnc":
+            return open_tigervnc()
+        if has_command("vncviewer"):
+            return open_tigervnc()
+        if has_command("open"):
+            return open_system()
+        print(f"No VNC viewer found. Connect manually to: 127.0.0.1:{local_port}")
+        with contextlib.suppress(EOFError):
+            input()
+        return 0
+    finally:
+        if passwd_file:
+            Path(passwd_file).unlink(missing_ok=True)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
