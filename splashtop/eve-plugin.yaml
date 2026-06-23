@@ -59,6 +59,7 @@ actions:
   - id: splashtop-info
     label: Splashtop Info
     target: splashtop.info
+    exec: commands/splashtop-info
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/splashtop.sh]

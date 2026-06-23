@@ -56,9 +56,11 @@ actions:
   - id: nomachine
     label: NoMachine
     target: nomachine.connect
+    exec: commands/nomachine-connect
   - id: nomachine-info
     label: NoMachine Info
     target: nomachine.info
+    exec: commands/nomachine-info
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/nomachine.sh]
