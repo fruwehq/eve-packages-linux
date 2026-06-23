@@ -20,6 +20,7 @@ actions:
   - id: waypipe
     label: Waypipe
     target: waypipe.open
+    exec: commands/waypipe-open
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/waypipe.sh]
