@@ -16,6 +16,7 @@ compatibility:
     notes: Installs GNOME with GDM autologin for the local graphical session.
 down: {destructive: true}
 env: []
+provides: [session:wayland]
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/gnome-desktop.sh]

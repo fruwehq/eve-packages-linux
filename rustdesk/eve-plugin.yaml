@@ -59,9 +59,12 @@ actions:
   - id: rustdesk
     label: RustDesk
     target: rustdesk.connect
+    exec: commands/rustdesk-launch
   - id: rustdesk-info
     label: RustDesk Info
     target: rustdesk.info
+    exec: commands/rustdesk-launch
+conflicts_capabilities: [session:wayland]
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/rustdesk.sh]
