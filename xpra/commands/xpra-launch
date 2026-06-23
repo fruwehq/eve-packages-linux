@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+"""Xpra session control (actions: xpra.start/stop/run/attach/desktop/apps/status).
+
+One launcher branches on EVE_REMOTE_ACTION (the mode is the target suffix). Reads
+EVE_REMOTE_* and uses $EVE_REMOTE_ROOT/scripts/instance-paths + `vagrant ssh-config`
+for the vagrant engine. Behavior ported from core scripts/remote-xpra.
+"""
+from __future__ import annotations
+
+import contextlib
+import os
+import re
+import shlex
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _client import (  # noqa: E402
+    has_command,
+    ssh_config_field,
+    xpra_attach_desktop_command,
+    xpra_attach_linux_command,
+    xpra_attach_windows_command,
+    xpra_ssh_opts,
+    xpra_tunnel_command,
+)
+
+_USAGE = "xpra-launch: unknown action (use start, stop, run, attach, desktop, apps, status)"
+_NOT_INSTALLED = (
+    "xpra not installed locally.\n"
+    "  macOS:  install the signed .pkg from https://xpra.org/install/ (also needs XQuartz)."
+)
+
+
+def _instance_workdir(root: str, instance: str) -> str:
+    result = subprocess.run(
+        [str(Path(root) / "scripts/instance-paths"), "--instance", instance, "--emit", "env"],
+        cwd=root, text=True, capture_output=True, check=False,
+    )
+    sys.stderr.write(result.stderr)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+    for line in result.stdout.splitlines():
+        if line.startswith("INSTANCE_WORKDIR="):
+            return line.split("=", 1)[1]
+    raise SystemExit(1)
+
+
+def _vagrant_ssh_config(workdir: str) -> str:
+    result = subprocess.run(["vagrant", "ssh-config"], cwd=workdir, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+    return result.stdout
+
+
+def _terminate(proc: subprocess.Popen[int]) -> None:
+    with contextlib.suppress(OSError):
+        proc.terminate()
+    with contextlib.suppress(OSError):
+        subprocess.run(["pkill", "-P", str(proc.pid)], check=False)
+
+
+def _xpra_desktop_setup(desktop_display: str, width: str, height: str, geometry: str) -> str:
+    template = (
+        "if xpra info :__DD__ >/dev/null 2>&1; then\n"
+        "  current=$(xpra info :__DD__ 2>/dev/null | awk -F= "
+        "'/^windows\\.1\\.size=/{print $2; exit}')\n"
+        "  expected='(__W__, __H__)'\n"
+        '  if [ "$current" != "$expected" ]; then\n'
+        "    echo '[xpra] existing desktop geometry is' "
+        "\"${current:-unknown}\" ', restarting for __G__'\n"
+        "    xpra stop :__DD__ >/dev/null 2>&1 || true\n"
+        "    for _ in 1 2 3 4 5; do\n"
+        "      xpra info :__DD__ >/dev/null 2>&1 || break\n"
+        "      sleep 1\n"
+        "    done\n"
+        "  fi\n"
+        "fi\n"
+        "xpra info :__DD__ >/dev/null 2>&1 || "
+        "xpra start-desktop :__DD__ --resize-display=__G__ --start=startxfce4"
+    )
+    return (
+        template.replace("__DD__", desktop_display)
+        .replace("__W__", width)
+        .replace("__H__", height)
+        .replace("__G__", geometry)
+    )
+
+
+def main() -> int:
+    action = os.environ.get("EVE_REMOTE_ACTION", "").rsplit(".", 1)[-1]
+    extra = shlex.split(os.environ.get("APP", ""))
+    root = os.environ.get("EVE_REMOTE_ROOT", ".")
+    instance = os.environ.get("EVE_REMOTE_INSTANCE", "")
+    engine = os.environ.get("EVE_REMOTE_ENGINE", "") or os.environ.get("ENGINE", "")
+    os_family = os.environ.get("EVE_REMOTE_OS_FAMILY", "") or os.environ.get("OS_FAMILY", "")
+    ip = os.environ.get("EVE_REMOTE_IP", "")
+
+    if engine == "vagrant":
+        ssh_user = "vagrant"
+        workdir = _instance_workdir(root, instance)
+        config = _vagrant_ssh_config(workdir)
+        ssh_port = ssh_config_field(config, "Port")
+        priv_key = ssh_config_field(config, "IdentityFile")
+    else:
+        ssh_user = os.environ.get("SSH_USER", "")
+        ssh_port = "22"
+        priv_key = os.environ.get("EVE_REMOTE_KEY", "")
+
+    if not ip:
+        print("xpra-launch: EVE_REMOTE_IP is not set", file=sys.stderr)
+        return 1
+
+    ssh_opts = xpra_ssh_opts(priv_key, ssh_port)
+    ssh_cmd = "ssh " + " ".join(ssh_opts)
+    display_num = os.environ.get("XPRA_DISPLAY", "100")
+    desktop_display_num = os.environ.get("XPRA_DESKTOP_DISPLAY", "101")
+    desktop_geometry = (
+        os.environ.get("XPRA_DESKTOP_GEOMETRY")
+        or os.environ.get("EPHEMERAL_DISPLAY_RESOLUTION")
+        or "1920x1080"
+    )
+    desktop_width = desktop_geometry.rsplit("x", 1)[0]
+    desktop_height = desktop_geometry.split("x", 1)[1]
+    tcp_port = os.environ.get("XPRA_TCP_PORT", "14500")
+    sctask_shadow = "XpraShadow"
+    sctask_run = "XpraRunApp"
+    uri = (
+        f"tcp://localhost:{tcp_port}"
+        if os_family == "windows"
+        else f"ssh://{ssh_user}@{ip}/{display_num}"
+    )
+
+    def remote_ssh(remote_cmd: str, suppress_err: bool = False) -> subprocess.CompletedProcess[str]:
+        result = subprocess.run(
+            ["ssh", *ssh_opts, "-l", ssh_user, ip, remote_cmd],
+            text=True, capture_output=True, check=False,
+        )
+        if not suppress_err and result.stderr:
+            sys.stderr.write(result.stderr)
+        return result
+
+    if action == "start":
+        if not has_command("xpra"):
+            print(_NOT_INSTALLED, file=sys.stderr)
+            return 1
+        if os_family == "windows":
+            print("[xpra] activating interactive session on Windows")
+            remote_ssh("tscon 1 /dest:console 2>$null; $null = New-Item -ItemType Directory -Force C:\\Users\\Administrator\\upload")
+            remote_ssh(
+                f'Set-Content -Path C:\\Users\\Administrator\\upload\\start-xpra-shadow.ps1 '
+                f"-Value \"Start-Process -FilePath 'C:\\Program Files\\Xpra\\Xpra_cmd.exe' "
+                f"-ArgumentList 'shadow','--bind-tcp=127.0.0.1:{tcp_port}' -WindowStyle Hidden\" -Force",
+                suppress_err=True,
+            )
+            remote_ssh(
+                f'SchTasks /Create /SC ONCE /TN {sctask_shadow} /TR "powershell -ExecutionPolicy '
+                "Bypass -File C:\\Users\\Administrator\\upload\\start-xpra-shadow.ps1\" "
+                "/ST 00:00 /RU Administrator /IT /F",
+                suppress_err=True,
+            )
+            run_result = remote_ssh(f"SchTasks /Run /TN {sctask_shadow}")
+            if run_result.returncode != 0:
+                print("xpra: remote xpra shadow failed to start", file=sys.stderr)
+                print(f"  Is xpra installed? Run: eve instance provision --instance {instance}", file=sys.stderr)
+                return 1
+            print(f"[xpra] shadow server started (TCP localhost:{tcp_port} via SSH tunnel)")
+        else:
+            print(f"[xpra] starting server on display :{display_num}")
+            start_result = remote_ssh(f"xpra start :{display_num}")
+            if start_result.returncode != 0:
+                print(f"xpra: remote 'xpra start :{display_num}' failed", file=sys.stderr)
+                print(f"  Is xpra installed? Run: eve instance provision --instance {instance}", file=sys.stderr)
+                return 1
+        print(f"[xpra] server running. Attach via the TUI package action.")
+        return 0
+
+    if action == "stop":
+        if os_family == "windows":
+            print("[xpra] stopping shadow server")
+            remote_ssh(
+                f"Stop-Process -Name Xpra_cmd -Force -ErrorAction SilentlyContinue; "
+                f"Stop-Process -Name Xpra -Force -ErrorAction SilentlyContinue; "
+                f"SchTasks /Delete /TN {sctask_shadow} /F 2>$null; "
+                f"SchTasks /Delete /TN {sctask_run} /F 2>$null",
+                suppress_err=True,
+            )
+        else:
+            print(f"[xpra] stopping session on display :{display_num}")
+            remote_ssh(f"xpra stop :{display_num}", suppress_err=True)
+        print("[xpra] stopped")
+        return 0
+
+    if action == "status":
+        if os_family == "windows":
+            result = remote_ssh(
+                "Get-Process -Name Xpra_cmd -ErrorAction SilentlyContinue | "
+                "Format-Table Id,ProcessName,SessionId -AutoSize"
+            )
+            if result.returncode != 0:
+                print("[xpra] no shadow server running")
+                return 1
+            sys.stdout.write(result.stdout)
+            return 0
+        result = remote_ssh(f"xpra info :{display_num} 2>/dev/null")
+        matched = [ln for ln in result.stdout.splitlines() if re.match(r"^(state|sessions|clients)", ln)]
+        if matched:
+            sys.stdout.write("\n".join(matched) + "\n")
+            return 0
+        print(f"[xpra] no session on display :{display_num}")
+        return 1
+
+    if action == "run":
+        if not extra:
+            print("xpra run: APP env is required", file=sys.stderr)
+            return 1
+        app_bin = extra[0]
+        start_cmd = " ".join(extra)
+        print(f"[xpra] launching '{start_cmd}'")
+        if os_family == "windows":
+            remote_ssh(
+                f'SchTasks /Create /SC ONCE /TN {sctask_run} /TR "{start_cmd}" '
+                "/ST 00:00 /RU Administrator /IT /F 2>&1 | Out-Null; "
+                f"SchTasks /Run /TN {sctask_run}",
+                suppress_err=True,
+            )
+            return 0
+        remote_ssh(f"xpra info :{display_num} >/dev/null 2>&1 || xpra start :{display_num}")
+        check = remote_ssh(f"command -v -- '{app_bin}' >/dev/null")
+        if check.returncode != 0:
+            print(f"xpra: remote command not found: {app_bin}", file=sys.stderr)
+            return 1
+        launch = remote_ssh(
+            f'log=/tmp/xpra-run-{display_num}.log; : > "$log"; '
+            f'DISPLAY=:{display_num} setsid {start_cmd} </dev/null >>"$log" 2>&1 & pid=$!; '
+            'sleep 1; if ! kill -0 "$pid" 2>/dev/null; then '
+            f'echo "xpra: \'{start_cmd}\' exited immediately" >&2; cat "$log" >&2; exit 1; fi'
+        )
+        return launch.returncode
+
+    if action == "attach":
+        if not has_command("xpra"):
+            print(_NOT_INSTALLED, file=sys.stderr)
+            return 1
+        if os_family == "windows":
+            tunnel = subprocess.Popen(xpra_tunnel_command(tcp_port, ssh_opts, ssh_user, ip))
+            time.sleep(1)
+            print("[xpra] attaching to shadow session via SSH tunnel (Ctrl-C to detach)")
+            xpra_proc = subprocess.Popen(xpra_attach_windows_command(uri))
+            try:
+                xpra_proc.wait()
+                return 0
+            finally:
+                print("[xpra] detaching")
+                _terminate(xpra_proc)
+                _terminate(tunnel)
+        remote_ssh(f"xpra info :{display_num} >/dev/null 2>&1 || xpra start :{display_num}")
+        print(f"[xpra] attaching to display :{display_num} (Ctrl-C to detach)")
+        xpra_proc = subprocess.Popen(xpra_attach_linux_command(uri, ssh_cmd))
+        try:
+            xpra_proc.wait()
+            return 0
+        finally:
+            print("[xpra] detaching")
+            _terminate(xpra_proc)
+
+    if action == "desktop":
+        if not has_command("xpra"):
+            print(_NOT_INSTALLED, file=sys.stderr)
+            return 1
+        if os_family == "windows":
+            print("xpra: desktop mode is Linux-only; use attach for Windows shadow mode.", file=sys.stderr)
+            return 2
+        print(f"[xpra] starting desktop on display :{desktop_display_num} ({desktop_geometry})")
+        remote_ssh(_xpra_desktop_setup(desktop_display_num, desktop_width, desktop_height, desktop_geometry))
+        print(f"[xpra] attaching to desktop :{desktop_display_num} (Ctrl-C to detach)")
+        desktop_uri = f"ssh://{ssh_user}@{ip}/{desktop_display_num}"
+        xpra_proc = subprocess.Popen(xpra_attach_desktop_command(desktop_uri, ssh_cmd))
+        try:
+            xpra_proc.wait()
+            return 0
+        finally:
+            print("[xpra] detaching desktop")
+            _terminate(xpra_proc)
+
+    if action == "apps":
+        if os_family == "windows":
+            result = remote_ssh(
+                'Get-ChildItem -Path "$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs",'
+                '"$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs" -Filter *.lnk -Recurse | '
+                "ForEach-Object { $name=$_.BaseName; "
+                "$target=(New-Object -ComObject WScript.Shell).CreateShortcut($_.FullName).TargetPath; "
+                'if($target){"{0,-40} {1}" -f $name,$target}} | Sort-Object -Unique'
+            )
+            sys.stdout.write(result.stdout)
+            return result.returncode
+        result = remote_ssh(
+            'for f in /usr/share/applications/*.desktop ~/.local/share/applications/*.desktop; do\n'
+            '  name=$(grep "^Name=" "$f" 2>/dev/null | head -1 | cut -d= -f2-)\n'
+            '  exec=$(grep "^Exec=" "$f" 2>/dev/null | head -1 | cut -d= -f2- | cut -d" " -f1)\n'
+            '  [ -n "$name" ] && [ -n "$exec" ] && printf "%-40s %s\\n" "$name" "$exec"\n'
+            "done 2>/dev/null | sort -u"
+        )
+        sys.stdout.write(result.stdout)
+        return result.returncode
+
+    print(_USAGE, file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
