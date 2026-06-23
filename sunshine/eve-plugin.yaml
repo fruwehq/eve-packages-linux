@@ -7,6 +7,20 @@ commands:
   status: {exec: scripts/package-plugin, args: [sunshine, status]}
   down: {exec: scripts/package-plugin, args: [sunshine, down]}
 supports: {os_families: [ubuntu]}
+config_schema:
+  config:
+    max_bitrate_kbps:
+      type: integer
+      env_var: SUNSHINE_MAX_BITRATE_KBPS
+      description: "Maximum Sunshine host streaming bitrate, in kilobits per second."
+    password:
+      type: string
+      env_var: EPHEMERAL_SUNSHINE_PASSWORD
+      description: "Password for the Sunshine web UI / Moonlight pairing flow."
+    version:
+      type: string
+      env_var: SUNSHINE_VERSION
+      description: "Sunshine version to install (pinned)."
 compatibility_enforced: true
 compatibility:
   - platform: windows
