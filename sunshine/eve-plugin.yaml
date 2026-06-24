@@ -83,6 +83,10 @@ actions:
     target: moonlight.open
     exec: commands/moonlight-open
     wait_for: sunshine.wait
+  - id: verify
+    label: Verify
+    target: sunshine.verify
+    exec: commands/verify
 vagrant:
   port_forwards:
     - {guest: 47984, host: 47984}

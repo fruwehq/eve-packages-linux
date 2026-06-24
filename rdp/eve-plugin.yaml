@@ -61,6 +61,10 @@ actions:
     target: rdp.open
     native: true
     exec: commands/rdp-open
+  - id: verify
+    label: Verify
+    target: rdp.verify
+    exec: commands/verify
 vagrant:
   port_forwards:
     - {guest: 3389, host: 3389}

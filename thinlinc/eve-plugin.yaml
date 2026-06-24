@@ -64,6 +64,10 @@ actions:
     label: ThinLinc Client
     target: thinlinc.client
     exec: commands/thinlinc-client
+  - id: verify
+    label: Verify
+    target: thinlinc.verify
+    exec: commands/verify
 vagrant:
   port_forwards:
     - {guest: 300, host: 300}

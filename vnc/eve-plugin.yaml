@@ -58,6 +58,10 @@ actions:
           label: macOS
         - value: tigervnc
           label: TigerVNC
+  - id: verify
+    label: Verify
+    target: vnc.verify
+    exec: commands/verify
 vagrant:
   port_forwards:
     - {guest: 5901, host: 5901}

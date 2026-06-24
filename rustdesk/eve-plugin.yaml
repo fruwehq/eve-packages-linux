@@ -64,6 +64,10 @@ actions:
     label: RustDesk Info
     target: rustdesk.info
     exec: commands/rustdesk-launch
+  - id: verify
+    label: Verify
+    target: rustdesk.verify
+    exec: commands/verify
 conflicts_capabilities: [session:wayland]
 install:
   ubuntu:
