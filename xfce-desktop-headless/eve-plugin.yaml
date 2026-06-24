@@ -16,6 +16,10 @@ compatibility:
     notes: Installs XFCE for xrdp without a local display manager.
 down: {destructive: true}
 env: []
+desktop:
+  name: "XFCE Headless"
+  session: "X11"
+  headless: true
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/xfce-desktop-headless.sh]

@@ -16,6 +16,10 @@ compatibility:
     notes: Installs KDE Plasma with SDDM autologin and disables lock/power management for unattended krdp.
 down: {destructive: true}
 env: []
+desktop:
+  name: "KDE Plasma Headless"
+  session: "Wayland"
+  headless: true
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/kde-desktop-headless.sh]

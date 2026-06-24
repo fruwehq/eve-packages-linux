@@ -17,6 +17,9 @@ compatibility:
 down: {destructive: true}
 env: []
 provides: [session:wayland]
+desktop:
+  name: "GNOME"
+  session: "Wayland"
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/gnome-desktop.sh]

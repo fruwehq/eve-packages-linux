@@ -16,6 +16,9 @@ compatibility:
     notes: Installs XFCE with LightDM autologin for a local graphical X11 session.
 down: {destructive: true}
 env: []
+desktop:
+  name: "XFCE"
+  session: "X11"
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/xfce-desktop.sh]
