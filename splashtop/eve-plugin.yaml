@@ -17,6 +17,7 @@ config_schema:
       description: "Splashtop account email for Streamer login."
     password:
       type: string
+      env_var: SPLASHTOP_PASSWORD
       description: "Splashtop account password for Streamer login."
     streamer_path:
       type: path
