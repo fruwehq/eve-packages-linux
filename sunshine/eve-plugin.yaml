@@ -7,6 +7,39 @@ commands:
   status: {exec: scripts/package-plugin, args: [sunshine, status]}
   down: {exec: scripts/package-plugin, args: [sunshine, down]}
 supports: {os_families: [ubuntu]}
+config_schema:
+  config:
+    max_bitrate_kbps:
+      type: integer
+      env_var: SUNSHINE_MAX_BITRATE_KBPS
+      description: "Maximum Sunshine host streaming bitrate, in kilobits per second."
+    password:
+      type: string
+      env_var: EPHEMERAL_SUNSHINE_PASSWORD
+      description: "Password for the Sunshine web UI / Moonlight pairing flow."
+    version:
+      type: string
+      env_var: SUNSHINE_VERSION
+      description: "Sunshine version to install (pinned)."
+    moonlight_bitrate_kbps:
+      type: integer
+      env_var: EPHEMERAL_MOONLIGHT_BITRATE_KBPS
+      description: "Moonlight client streaming bitrate, in kilobits per second."
+    moonlight_display_mode:
+      type: enum
+      enum: [fullscreen, borderless, windowed]
+      env_var: EPHEMERAL_MOONLIGHT_DISPLAY_MODE
+      description: "Moonlight client window mode."
+    moonlight_video_codec:
+      type: enum
+      enum: [auto, "H.264", HEVC, AV1]
+      env_var: EPHEMERAL_MOONLIGHT_VIDEO_CODEC
+      description: "Preferred Moonlight client video codec."
+    moonlight_video_decoder:
+      type: enum
+      enum: [auto, hardware, software]
+      env_var: EPHEMERAL_MOONLIGHT_VIDEO_DECODER
+      description: "Moonlight client video decoder selection."
 compatibility_enforced: true
 compatibility:
   - platform: windows
@@ -35,12 +68,34 @@ actions:
   - id: sunshine
     label: Sunshine
     target: sunshine.open
+    exec: commands/sunshine-open
+  - id: sunshine-wait
+    label: Wait for Sunshine
+    target: sunshine.wait
+    exec: commands/sunshine-wait
   - id: pair-moonlight
     label: Pair Moonlight
     target: moonlight.pair
+    exec: commands/moonlight-pair
+    wait_for: sunshine.wait
   - id: moonlight
     label: Moonlight
     target: moonlight.open
+    exec: commands/moonlight-open
+    wait_for: sunshine.wait
+  - id: verify
+    label: Verify
+    target: sunshine.verify
+    exec: commands/verify
+vagrant:
+  port_forwards:
+    - {guest: 47984, host: 47984}
+    - {guest: 47989, host: 47989}
+    - {guest: 47990, host: 47990}
+    - {guest: 48010, host: 48010}
+    - {guest: 47998, host: 47998, protocol: udp}
+    - {guest: 47999, host: 47999, protocol: udp}
+    - {guest: 48000, host: 48000, protocol: udp}
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/sunshine.sh]

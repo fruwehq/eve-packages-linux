@@ -45,6 +45,7 @@ actions:
   - id: vnc
     label: VNC
     target: vnc.open
+    exec: commands/vnc-open
     prompt:
       title: Open VNC
       message: Choose the viewer for this VNC session.
@@ -57,6 +58,13 @@ actions:
           label: macOS
         - value: tigervnc
           label: TigerVNC
+  - id: verify
+    label: Verify
+    target: vnc.verify
+    exec: commands/verify
+vagrant:
+  port_forwards:
+    - {guest: 5901, host: 5901}
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/vnc.sh]

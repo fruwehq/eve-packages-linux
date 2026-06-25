@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+"""Print how to reach an instance through Splashtop (action: splashtop.info)."""
+from __future__ import annotations
+
+import os
+
+
+def main() -> int:
+    ip = os.environ.get("EVE_REMOTE_IP", "(no IP)")
+    email = os.environ.get("SPLASHTOP_EMAIL") or "(set SPLASHTOP_EMAIL)"
+    print(f"Splashtop account: {email}")
+    print(f"Instance host:     {ip}")
+    print()
+    print(f"Open the Splashtop Business app, sign in as {email}, and connect to this")
+    print("instance (free for same-LAN/VPN use).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

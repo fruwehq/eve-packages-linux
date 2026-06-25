@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Verify RDP is reachable (action: verify)."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+
+ROOT = os.environ.get("EVE_REMOTE_ROOT", ".")
+INST = os.environ.get("EVE_REMOTE_INSTANCE", "")
+OSF = os.environ.get("EVE_REMOTE_OS_FAMILY", "") or os.environ.get("OS_FAMILY", "")
+USER = os.environ.get("VM_USER_NAME", "") or os.environ.get("SSH_USER", "")
+failures = 0
+
+
+def remote_check(cmd: str) -> bool:
+    return subprocess.run([f"{ROOT}/scripts/instance-ssh", INST, "--", cmd],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def q(s: str) -> str:
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
+def main() -> int:
+    global failures
+    if OSF == "windows":
+        print(f"ok   {'rdp':<14} Windows RDP helper can use Administrator password")
+    elif OSF == "ubuntu":
+        rdp_password = os.environ.get("RDP_GATE_PASSWORD", "") or os.environ.get("VM_USER_PASSWORD", "")
+        if not rdp_password:
+            print(f"fail {'rdp':<14} VM_USER_PASSWORD or RDP_GATE_PASSWORD is not set")
+            failures += 1
+        else:
+            print(f"ok   {'rdp':<14} Ubuntu RDP password is set")
+        if not USER:
+            print(f"fail {'rdp':<14} VM_USER_NAME is not known, cannot verify Linux password state")
+            failures += 1
+        else:
+            huq = q(USER)
+            if remote_check(
+                f'human_user={huq}; sudo getent shadow "$human_user" | '
+                r"awk -F: 'length($2) > 0 && $2 !~ /^(!|\*)/ { ok=1 } END { exit !ok }'"
+            ):
+                print(f"ok   {'rdp':<14} Linux password hash is present for {USER}")
+            else:
+                print(f"fail {'rdp':<14} Linux password is locked or missing for {USER}")
+                failures += 1
+        if remote_check('systemctl is-active --quiet xrdp && ss -tln | grep -q ":3389 "'):
+            print(f"ok   {'rdp':<14} xrdp active on tcp/3389")
+        else:
+            print(f"fail {'rdp':<14} xrdp is not active/listening on tcp/3389")
+            failures += 1
+    else:
+        print(f"fail {'rdp':<14} unsupported OS family: {OSF}")
+        failures += 1
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

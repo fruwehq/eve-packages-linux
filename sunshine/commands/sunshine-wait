@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+"""Wait until the Sunshine API accepts authenticated requests (action: sunshine.wait)."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _client import sunshine_config_curl_command, validate_unix_user  # noqa: E402
+
+
+def main() -> int:
+    vm_user = os.environ.get("VM_USER_NAME", "") or os.environ.get("SSH_USER", "")
+    if vm_user:
+        validate_unix_user(vm_user)
+    if "sunshine" not in os.environ.get("BUNDLE_PACKAGES", "").split(","):
+        print("sunshine not in bundle — skipping")
+        return 0
+    ip = os.environ.get("EVE_REMOTE_IP", "")
+    if not ip:
+        print("sunshine-wait: EVE_REMOTE_IP is not set", file=sys.stderr)
+        return 1
+    max_attempts = 20
+    print(f"Waiting for Sunshine API on {ip}:47990...")
+    for attempt in range(1, max_attempts + 1):
+        result = subprocess.run(sunshine_config_curl_command(ip), capture_output=True, text=True, check=False)
+        if result.stdout.startswith("2"):
+            print(f"Sunshine API is ready on {ip}:47990")
+            return 0
+        print(f"Sunshine API not ready yet (attempt {attempt}/{max_attempts}, http={result.stdout}). Sleeping 2 seconds...")
+        time.sleep(2)
+    print("Sunshine API did not become ready in time.")
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

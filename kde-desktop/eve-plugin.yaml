@@ -16,6 +16,9 @@ compatibility:
     notes: Installs KDE Plasma with SDDM autologin; RDP uses krdp.
 down: {destructive: true}
 env: []
+desktop:
+  name: "KDE Plasma"
+  session: "Wayland"
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/kde-desktop.sh]

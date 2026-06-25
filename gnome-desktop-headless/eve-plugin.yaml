@@ -16,6 +16,10 @@ compatibility:
     notes: Installs GNOME with GDM autologin and persistent Wayland virtual monitor setup.
 down: {destructive: true}
 env: [VIRTUAL_MONITOR_WIDTH, VIRTUAL_MONITOR_HEIGHT]
+desktop:
+  name: "GNOME Headless"
+  session: "Wayland"
+  headless: true
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/gnome-desktop-headless.sh]

@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""Verify RustDesk is connected (action: verify)."""
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import sys
+
+ROOT = os.environ.get("EVE_REMOTE_ROOT", ".")
+INST = os.environ.get("EVE_REMOTE_INSTANCE", "")
+OSF = os.environ.get("EVE_REMOTE_OS_FAMILY", "") or os.environ.get("OS_FAMILY", "")
+failures = 0
+
+
+def ssh(cmd: str) -> str:
+    r = subprocess.run([f"{ROOT}/scripts/instance-ssh", INST, "--", cmd],
+                       capture_output=True, text=True, check=False)
+    return r.stdout
+
+
+def remote_check(cmd: str) -> bool:
+    return subprocess.run([f"{ROOT}/scripts/instance-ssh", INST, "--", cmd],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def main() -> int:
+    global failures
+    if OSF == "ubuntu":
+        rustdesk_id = re.sub(r"\s", "", ssh("sudo rustdesk --get-id 2>/dev/null || rustdesk --get-id 2>/dev/null || true"))
+        if rustdesk_id:
+            print(f"ok   {'rustdesk':<14} RustDesk ID available")
+        else:
+            print(f"fail {'rustdesk':<14} RustDesk ID is not available")
+            failures += 1
+        if remote_check(
+            r'loginctl show-session "$(loginctl --no-legend | awk "{print \$1}\" | head -1)" -p Type 2>/dev/null | grep -q wayland'
+        ):
+            print(f"fail {'rustdesk':<14} active session is Wayland; not unattended-capturable")
+            failures += 1
+        elif remote_check(
+            r'pgrep -u "$(id -u "$(getent passwd | grep -E "x|xfce|gnome" | head -1 | cut -d: -f1)")" -f "Xorg|Xwayland" >/dev/null 2>&1 || echo ok'
+        ):
+            print(f"ok   {'rustdesk':<14} capturable desktop/session is present")
+        else:
+            print(f"fail {'rustdesk':<14} no capturable desktop/session found")
+            failures += 1
+    elif OSF == "windows":
+        if remote_check(
+            r'''powershell.exe -NoProfile -Command '$svc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match "rustdesk" -or $_.DisplayName -match "rustdesk" } | Select-Object -First 1; if (-not $svc -or $svc.Status -ne "Running") { exit 1 }' '''
+        ):
+            print(f"ok   {'rustdesk':<14} Windows service is running")
+        else:
+            print(f"fail {'rustdesk':<14} Windows service is not running")
+            failures += 1
+    else:
+        print(f"fail {'rustdesk':<14} unsupported OS family: {OSF}")
+        failures += 1
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

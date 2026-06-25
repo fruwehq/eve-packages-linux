@@ -7,6 +7,12 @@ commands:
   status: {exec: scripts/package-plugin, args: [nomachine, status]}
   down: {exec: scripts/package-plugin, args: [nomachine, down]}
 supports: {os_families: [ubuntu]}
+config_schema:
+  config:
+    version:
+      type: string
+      env_var: NOMACHINE_VERSION
+      description: "NoMachine server version to install (pinned)."
 compatibility_enforced: true
 compatibility:
   - platform: windows
@@ -50,9 +56,11 @@ actions:
   - id: nomachine
     label: NoMachine
     target: nomachine.connect
+    exec: commands/nomachine-connect
   - id: nomachine-info
     label: NoMachine Info
     target: nomachine.info
+    exec: commands/nomachine-info
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/nomachine.sh]

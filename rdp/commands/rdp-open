@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Open an RDP session to the instance (action: rdp.open).
+
+Reads the EVE_REMOTE_* contract (exported by core's package-action dispatcher)
+and uses $EVE_REMOTE_ROOT/scripts/instance-password for the Windows password.
+Behavior ported verbatim from the former core scripts/remote-rdp.
+"""
+from __future__ import annotations
+
+import os
+import platform
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _client import msrdp_open_command, msrdp_paste_command, rdp_file_lines, xfreerdp_command  # noqa: E402
+
+
+def _has_command(name: str) -> bool:
+    from shutil import which
+    return which(name) is not None
+
+
+def _has_package(package: str) -> bool:
+    return package in os.environ.get("BUNDLE_PACKAGES", "").split(",")
+
+
+def _exec_replace(cmd: list[str]) -> int:
+    os.execvp(cmd[0], cmd)
+    return 0  # unreachable
+
+
+def _instance_password() -> str:
+    root = os.environ.get("EVE_REMOTE_ROOT", ".")
+    instance = os.environ.get("EVE_REMOTE_INSTANCE", "")
+    result = subprocess.run(
+        [str(Path(root) / "scripts/instance-password"), instance],
+        cwd=root, text=True, capture_output=True, check=False,
+    )
+    sys.stderr.write(result.stderr)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+    return result.stdout.strip()
+
+
+def main() -> int:
+    os_family = os.environ.get("EVE_REMOTE_OS_FAMILY", "") or os.environ.get("OS_FAMILY", "")
+    ip = os.environ.get("EVE_REMOTE_IP", "")
+    host_os = platform.system()
+
+    credssp = 1
+    redirect = 0
+    windows_app_ok = 1
+    freerdp_extra: list[str] = []
+
+    if os_family == "windows":
+        username = "Administrator"
+        pw = _instance_password()
+        admin_session = 1
+    elif os_family == "ubuntu":
+        vm_username = (
+            os.environ.get("VM_USER_NAME")
+            or os.environ.get("HUMAN_USER_NAME")
+            or os.environ.get("ACCESS_HUMAN_USER")
+            or os.environ.get("SSH_USER", "")
+        )
+        if _has_package("gnome-desktop") or _has_package("gnome-desktop-headless"):
+            username = os.environ.get("RDP_GATE_USER", "rdpuser")
+            pw = os.environ.get("RDP_GATE_PASSWORD") or os.environ.get("VM_USER_PASSWORD", "")
+            credssp = 0
+            redirect = 0
+            windows_app_ok = 1
+        elif _has_package("kde-desktop") or _has_package("kde-desktop-headless"):
+            username = vm_username
+            pw = os.environ.get("VM_USER_PASSWORD", "")
+            credssp = 1
+            redirect = 1
+            freerdp_extra = ["/gfx:AVC444"]
+            windows_app_ok = 0
+        else:
+            username = vm_username
+            pw = os.environ.get("VM_USER_PASSWORD", "")
+            credssp = 1
+            redirect = 1
+            windows_app_ok = 1
+        if not username:
+            username = os.environ.get("VM_USER_NAME", "")
+        if not username:
+            print("rdp-open: VM_USER_NAME is required for Ubuntu RDP", file=sys.stderr)
+            return 2
+        if not pw:
+            print("rdp-open: VM_USER_PASSWORD or RDP_GATE_PASSWORD is required for Ubuntu RDP login", file=sys.stderr)
+            return 2
+        admin_session = 0
+    else:
+        print(f"rdp-open: unsupported OS family '{os_family}'", file=sys.stderr)
+        return 2
+
+    root = os.environ.get("EVE_REMOTE_ROOT", ".")
+    rdp_dir = Path(root) / "tmp"
+    rdp_dir.mkdir(parents=True, exist_ok=True)
+    rdp_file = rdp_dir / "windows.rdp"
+    rdp_file.write_text("\n".join(rdp_file_lines(ip, username, credssp, redirect, admin_session)) + "\n")
+
+    if windows_app_ok == 0:
+        if _has_command("xfreerdp"):
+            _exec_replace(xfreerdp_command(ip, username, pw, freerdp_extra))
+        if host_os == "Darwin":
+            print("rdp-open: this KDE/krdp profile is not compatible with macOS Windows App; install xfreerdp.", file=sys.stderr)
+        elif host_os == "Linux":
+            print("rdp-open: xfreerdp is required on Linux. Install with: apt install freerdp2-x11", file=sys.stderr)
+        else:
+            print(f"rdp-open: unsupported host OS: {host_os}", file=sys.stderr)
+        return 2
+
+    if host_os == "Darwin":
+        if not _has_command("pbcopy"):
+            print("rdp-open: pbcopy is required on macOS", file=sys.stderr)
+            return 2
+        subprocess.run(["pbcopy"], input=pw, text=True, check=False)
+        result = subprocess.run(msrdp_open_command(str(rdp_file)), check=False)
+        if result.returncode != 0:
+            print("rdp-open: Microsoft Remote Desktop is required on macOS", file=sys.stderr)
+            return 2
+        time.sleep(3)
+        return subprocess.run(msrdp_paste_command(), check=False).returncode
+
+    if host_os == "Linux":
+        if _has_command("xfreerdp"):
+            _exec_replace(xfreerdp_command(ip, username, pw, freerdp_extra))
+        print("rdp-open: xfreerdp is required on Linux. Install with: apt install freerdp2-x11", file=sys.stderr)
+        return 2
+
+    print(f"rdp-open: unsupported host OS: {host_os}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

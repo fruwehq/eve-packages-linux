@@ -9,6 +9,28 @@ commands:
 supports:
   os_families: [ubuntu]
   arches: [amd64]
+config_schema:
+  config:
+    accept_eula:
+      type: boolean
+      env_var: THINLINC_ACCEPT_EULA
+      description: "Set to true to accept the ThinLinc server EULA during install."
+    agent_hostname:
+      type: string
+      env_var: THINLINC_AGENT_HOSTNAME
+      description: "Hostname the ThinLinc agent advertises to clients."
+    server_bundle_path:
+      type: path
+      env_var: THINLINC_SERVER_BUNDLE_PATH
+      description: "Local path to a downloaded ThinLinc server bundle."
+    server_bundle_url:
+      type: url
+      env_var: THINLINC_SERVER_BUNDLE_URL
+      description: "URL to download the ThinLinc server bundle from."
+    webaccess_port:
+      type: integer
+      env_var: THINLINC_WEBACCESS_PORT
+      description: "TCP port for ThinLinc Web Access."
 compatibility_enforced: true
 compatibility:
   - platform: ubuntu
@@ -37,9 +59,18 @@ actions:
   - id: web
     label: ThinLinc Web
     target: thinlinc.web
+    exec: commands/thinlinc-web
   - id: client
     label: ThinLinc Client
     target: thinlinc.client
+    exec: commands/thinlinc-client
+  - id: verify
+    label: Verify
+    target: thinlinc.verify
+    exec: commands/verify
+vagrant:
+  port_forwards:
+    - {guest: 300, host: 300}
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/thinlinc.sh]

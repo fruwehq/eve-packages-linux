@@ -28,9 +28,14 @@ actions:
   - id: xpra-desktop
     label: Xpra Desktop
     target: xpra.desktop
+    exec: commands/xpra-launch
   - id: xpra-attach
     label: Xpra Attach
     target: xpra.attach
+    exec: commands/xpra-launch
+vagrant:
+  port_forwards:
+    - {guest: 14500, host: 14500}
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/xpra.sh]

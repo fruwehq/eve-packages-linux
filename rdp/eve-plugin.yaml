@@ -7,6 +7,15 @@ commands:
   status: {exec: scripts/package-plugin, args: [rdp, status]}
   down: {exec: scripts/package-plugin, args: [rdp, down]}
 supports: {os_families: [ubuntu]}
+config_schema:
+  config:
+    gate_user:
+      type: string
+      env_var: RDP_GATE_USER
+      description: "Username for the RDP gateway login on GNOME desktops."
+    gate_password:
+      type: string
+      description: "Password for the RDP gateway login on GNOME desktops."
 compatibility_enforced: true
 compatibility:
   - platform: windows
@@ -51,6 +60,14 @@ actions:
     label: RDP
     target: rdp.open
     native: true
+    exec: commands/rdp-open
+  - id: verify
+    label: Verify
+    target: rdp.verify
+    exec: commands/verify
+vagrant:
+  port_forwards:
+    - {guest: 3389, host: 3389}
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/rdp.sh]

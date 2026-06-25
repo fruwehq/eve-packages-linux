@@ -9,6 +9,23 @@ commands:
 supports:
   os_families: [ubuntu]
   arches: [amd64]
+config_schema:
+  config:
+    email:
+      type: string
+      env_var: SPLASHTOP_EMAIL
+      description: "Splashtop account email for Streamer login."
+    password:
+      type: string
+      description: "Splashtop account password for Streamer login."
+    streamer_path:
+      type: path
+      env_var: SPLASHTOP_STREAMER_PATH
+      description: "Local path to a downloaded Splashtop Streamer installer."
+    streamer_url:
+      type: url
+      env_var: SPLASHTOP_STREAMER_URL
+      description: "URL to download the Splashtop Streamer installer from."
 compatibility_enforced: true
 compatibility:
   - platform: windows
@@ -42,6 +59,7 @@ actions:
   - id: splashtop-info
     label: Splashtop Info
     target: splashtop.info
+    exec: commands/splashtop-info
 install:
   ubuntu:
     steps: [base.sh, timezone.sh, provision/ubuntu/splashtop.sh]
