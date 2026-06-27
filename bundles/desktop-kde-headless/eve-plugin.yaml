@@ -1,0 +1,5 @@
+api_version: eve.plugin/v1
+kind: bundle
+id: desktop-kde-headless
+display_name: KDE Plasma Desktop (Headless)
+members: [kde-desktop-headless, rdp]
