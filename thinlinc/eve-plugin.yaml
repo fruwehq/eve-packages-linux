@@ -54,7 +54,7 @@ compatibility:
     status: unsupported
     notes: ThinLinc serves X11 sessions, not the local GNOME Wayland compositor.
 down: {destructive: true}
-env: [THINLINC_ACCEPT_EULA, THINLINC_SERVER_BUNDLE_PATH, THINLINC_SERVER_BUNDLE_URL, THINLINC_WEBACCESS_PORT]
+env: [THINLINC_ACCEPT_EULA, THINLINC_AGENT_HOSTNAME, THINLINC_SERVER_BUNDLE_PATH, THINLINC_SERVER_BUNDLE_URL, THINLINC_WEBACCESS_PORT]
 actions:
   - id: web
     label: ThinLinc Web

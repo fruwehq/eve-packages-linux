@@ -239,7 +239,7 @@ setup-selinux=no
 EOF
 
 log "### thinlinc: running tl-setup non-interactively"
-DISPLAY= sudo /opt/thinlinc/sbin/tl-setup -a "$answer_template"
+DISPLAY='' sudo /opt/thinlinc/sbin/tl-setup -a "$answer_template"
 
 configure_agent_hostname
 
