@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
 set -eu
 
+# Variables in the command payload expand on the guest.
+# shellcheck disable=SC2016
 exec ./scripts/package-status-command rdp 'if systemctl is-active --quiet gnome-remote-desktop.service 2>/dev/null || command -v xrdp >/dev/null 2>&1 || dpkg-query -W -f="${Status}" xrdp 2>/dev/null | grep -q "install ok installed"; then echo installed; else echo missing; fi'

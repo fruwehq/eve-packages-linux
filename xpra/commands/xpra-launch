@@ -174,7 +174,7 @@ def main() -> int:
                 print(f"xpra: remote 'xpra start :{display_num}' failed", file=sys.stderr)
                 print(f"  Is xpra installed? Run: eve instance provision --instance {instance}", file=sys.stderr)
                 return 1
-        print(f"[xpra] server running. Attach via the TUI package action.")
+        print("[xpra] server running. Attach via the TUI package action.")
         return 0
 
     if action == "stop":

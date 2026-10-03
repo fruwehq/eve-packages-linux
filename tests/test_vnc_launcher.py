@@ -1,7 +1,6 @@
 """Argv parity for the vnc launcher builders (v4.4 §8)."""
 from __future__ import annotations
 
-import os
 
 import pytest
 
