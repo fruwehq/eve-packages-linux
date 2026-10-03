@@ -9,7 +9,7 @@ def main() -> int:
     ip = os.environ.get("EVE_REMOTE_IP", "(no IP)")
     user = os.environ.get("VM_USER_NAME", "") or "the instance user"
     print(f"Host:  {ip}")
-    print(f"Port:  4000 (NX)")
+    print("Port:  4000 (NX)")
     print(f"User:  {user}")
     print("Auth:  the instance user's system password")
     return 0

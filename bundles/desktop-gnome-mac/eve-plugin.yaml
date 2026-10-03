@@ -1,0 +1,5 @@
+api_version: eve.plugin/v1
+kind: bundle
+id: desktop-gnome-mac
+display_name: GNOME Desktop (macOS themed)
+members: [gnome-desktop, macos-desktop-theme, rdp]

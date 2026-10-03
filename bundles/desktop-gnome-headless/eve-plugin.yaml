@@ -1,0 +1,5 @@
+api_version: eve.plugin/v1
+kind: bundle
+id: desktop-gnome-headless
+display_name: GNOME Desktop (Headless)
+members: [gnome-desktop-headless, rdp]

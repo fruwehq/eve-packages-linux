@@ -3,26 +3,49 @@ kind: package
 id: kde-desktop-headless
 display_name: KDE Plasma Desktop Headless
 commands:
-  install: {exec: scripts/package-plugin, args: [kde-desktop-headless, install]}
-  status: {exec: scripts/package-plugin, args: [kde-desktop-headless, status]}
-  down: {exec: scripts/package-plugin, args: [kde-desktop-headless, down]}
-supports: {os_families: [ubuntu], arches: [amd64]}
-conflicts_with: [xfce-desktop, xfce-desktop-headless, gnome-desktop, gnome-desktop-headless, kde-desktop]
+  install:
+    exec: scripts/package-plugin
+    args:
+    - kde-desktop-headless
+    - install
+  status:
+    exec: scripts/package-plugin
+    args:
+    - kde-desktop-headless
+    - status
+  down:
+    exec: scripts/package-plugin
+    args:
+    - kde-desktop-headless
+    - down
+supports:
+  os_families:
+  - ubuntu
+  arches:
+  - amd64
+conflicts_with:
+- xfce-desktop
+- xfce-desktop-headless
+- gnome-desktop
+- gnome-desktop-headless
+- kde-desktop
 compatibility:
-  - platform: ubuntu
-    desktop: KDE Plasma Headless
-    session: Wayland
-    status: supported
-    notes: Installs KDE Plasma with SDDM autologin and disables lock/power management for unattended krdp.
-down: {destructive: true}
+- platform: ubuntu
+  desktop: KDE Plasma Headless
+  session: Wayland
+  status: supported
+  notes: Installs KDE Plasma with SDDM autologin and disables lock/power management
+    for unattended krdp.
+down:
+  destructive: true
 env: []
 desktop:
-  name: "KDE Plasma Headless"
-  session: "Wayland"
+  name: KDE Plasma Headless
+  session: Wayland
   headless: true
 install:
   ubuntu:
-    steps: [base.sh, timezone.sh, provision/ubuntu/kde-desktop-headless.sh]
-bundles:
-  - id: desktop-kde-headless
-    includes: [kde-desktop-headless, rdp]
+    steps:
+    - base.sh
+    - timezone.sh
+    - provision/ubuntu/kde-desktop-headless.sh

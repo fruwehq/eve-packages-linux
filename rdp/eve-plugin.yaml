@@ -13,8 +13,10 @@ config_schema:
       type: string
       env_var: RDP_GATE_USER
       description: "Username for the RDP gateway login on GNOME desktops."
+  secrets:
     gate_password:
       type: string
+      env_var: RDP_GATE_PASSWORD
       description: "Password for the RDP gateway login on GNOME desktops."
 compatibility_enforced: true
 compatibility:
@@ -54,7 +56,7 @@ compatibility:
     status: supported
     notes: Uses krdp with lock and power management disabled for unattended sessions.
 down: {destructive: true}
-env: [RDP_GATE_USER, RDP_GATE_PASSWORD]
+env: [EPHEMERAL_DISPLAY_RESOLUTION, RDP_GATE_PASSWORD, RDP_GATE_USER]
 actions:
   - id: rdp
     label: RDP

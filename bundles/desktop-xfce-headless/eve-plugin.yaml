@@ -1,0 +1,5 @@
+api_version: eve.plugin/v1
+kind: bundle
+id: desktop-xfce-headless
+display_name: XFCE Desktop (Headless)
+members: [xfce-desktop-headless, rdp]

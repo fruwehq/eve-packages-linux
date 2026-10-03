@@ -1,0 +1,5 @@
+api_version: eve.plugin/v1
+kind: bundle
+id: desktop-streaming
+display_name: Desktop Streaming
+members: [sunshine, rustdesk, vnc, rdp, waypipe]

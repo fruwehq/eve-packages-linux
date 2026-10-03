@@ -1,0 +1,5 @@
+api_version: eve.plugin/v1
+kind: bundle
+id: remote-xpra
+display_name: Remote Xpra
+members: [xpra]

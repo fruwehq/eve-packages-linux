@@ -3,15 +3,32 @@ kind: package
 id: steam
 display_name: Steam
 commands:
-  install: {exec: scripts/package-plugin, args: [steam, install]}
-  status: {exec: scripts/package-plugin, args: [steam, status]}
-  down: {exec: scripts/package-plugin, args: [steam, down]}
-supports: {os_families: [ubuntu], arches: [amd64]}
-down: {destructive: true}
+  install:
+    exec: scripts/package-plugin
+    args:
+    - steam
+    - install
+  status:
+    exec: scripts/package-plugin
+    args:
+    - steam
+    - status
+  down:
+    exec: scripts/package-plugin
+    args:
+    - steam
+    - down
+supports:
+  os_families:
+  - ubuntu
+  arches:
+  - amd64
+down:
+  destructive: true
 env: []
 install:
   ubuntu:
-    steps: [base.sh, timezone.sh, provision/ubuntu/steam.sh]
-bundles:
-  - id: gaming-streaming
-    includes: [sunshine, steam, rustdesk]
+    steps:
+    - base.sh
+    - timezone.sh
+    - provision/ubuntu/steam.sh

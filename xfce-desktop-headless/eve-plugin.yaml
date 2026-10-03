@@ -3,26 +3,46 @@ kind: package
 id: xfce-desktop-headless
 display_name: XFCE Desktop Headless
 commands:
-  install: {exec: scripts/package-plugin, args: [xfce-desktop-headless, install]}
-  status: {exec: scripts/package-plugin, args: [xfce-desktop-headless, status]}
-  down: {exec: scripts/package-plugin, args: [xfce-desktop-headless, down]}
-supports: {os_families: [ubuntu]}
-conflicts_with: [xfce-desktop, gnome-desktop, gnome-desktop-headless, kde-desktop, kde-desktop-headless]
+  install:
+    exec: scripts/package-plugin
+    args:
+    - xfce-desktop-headless
+    - install
+  status:
+    exec: scripts/package-plugin
+    args:
+    - xfce-desktop-headless
+    - status
+  down:
+    exec: scripts/package-plugin
+    args:
+    - xfce-desktop-headless
+    - down
+supports:
+  os_families:
+  - ubuntu
+conflicts_with:
+- xfce-desktop
+- gnome-desktop
+- gnome-desktop-headless
+- kde-desktop
+- kde-desktop-headless
 compatibility:
-  - platform: ubuntu
-    desktop: XFCE Headless
-    session: X11
-    status: supported
-    notes: Installs XFCE for xrdp without a local display manager.
-down: {destructive: true}
+- platform: ubuntu
+  desktop: XFCE Headless
+  session: X11
+  status: supported
+  notes: Installs XFCE for xrdp without a local display manager.
+down:
+  destructive: true
 env: []
 desktop:
-  name: "XFCE Headless"
-  session: "X11"
+  name: XFCE Headless
+  session: X11
   headless: true
 install:
   ubuntu:
-    steps: [base.sh, timezone.sh, provision/ubuntu/xfce-desktop-headless.sh]
-bundles:
-  - id: desktop-xfce-headless
-    includes: [xfce-desktop-headless, rdp]
+    steps:
+    - base.sh
+    - timezone.sh
+    - provision/ubuntu/xfce-desktop-headless.sh

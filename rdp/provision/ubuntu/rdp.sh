@@ -71,8 +71,15 @@ configure_gnome_rdp() {
   human_run grdctl rdp enable
 
   if [ "$headless" = "headless" ]; then
-    local width="${VIRTUAL_MONITOR_WIDTH:-1920}"
-    local height="${VIRTUAL_MONITOR_HEIGHT:-1080}"
+    local resolution="$EPHEMERAL_DISPLAY_RESOLUTION"
+    local width="${resolution%x*}"
+    local height="${resolution#*x}"
+    case "$width:$height" in
+      *[!0-9:]*|:*|*:)
+        log "ERROR: display resolution must use the WxH format: $resolution"
+        return 1
+        ;;
+    esac
     if grdctl_supports "set-virtual-monitor"; then
       log "### rdp: configuring GNOME virtual monitor ${width}x${height}"
       human_run grdctl rdp set-virtual-monitor "${width}x${height}" || true
