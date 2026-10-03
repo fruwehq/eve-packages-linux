@@ -36,9 +36,7 @@ compatibility:
     setup.
 down:
   destructive: true
-env:
-- VIRTUAL_MONITOR_WIDTH
-- VIRTUAL_MONITOR_HEIGHT
+env: []
 desktop:
   name: GNOME Headless
   session: Wayland
